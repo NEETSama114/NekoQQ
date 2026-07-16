@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="neko.qq">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:label="NekoQQ"
+        android:supportsRtl="true"
+        tools:ignore="MissingApplicationIcon">
+
+        <!-- ===== LSPosed / Xposed 模块声明 ===== -->
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="NekoQQ 增强模块：防撤回 / 高级群管 / 表情面板 / 显示界面 / 隐私去广告 / 社交增强，并新增「Neko设置」（位于账号与安全上方），支持自动拉取 hook 配置跨版本适配" />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="82" />
+
+        <!-- 模块自身设置页（独立可启动，也供注入入口跳转） -->
+        <activity
+            android:name=".ui.NekoSettingsActivity"
+            android:exported="true"
+            android:label="Neko设置"
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

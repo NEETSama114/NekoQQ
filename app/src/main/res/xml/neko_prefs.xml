@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="消息增强">
+        <SwitchPreferenceCompat
+            android:key="anti_recall"
+            android:title="防撤回"
+            android:summary="对方撤回消息时保留原文并提示"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="recall_banner"
+            android:title="显示撤回提示横幅"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="recall_keep"
+            android:title="保留被撤回的消息内容"
+            android:defaultValue="true" />
+        <EditTextPreference
+            android:key="recall_text"
+            android:title="提示文案"
+            android:defaultValue="想撤回？Neko 已经帮你存好啦~" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="群聊管理">
+        <SwitchPreferenceCompat
+            android:key="group_mgr"
+            android:title="高级群管"
+            android:summary="点击群成员头像即可禁言 / 封禁 / 踢出"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="group_confirm"
+            android:title="危险操作需二次确认"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="group_log"
+            android:title="操作写入群日志"
+            android:defaultValue="true" />
+        <EditTextPreference
+            android:key="group_mute_min"
+            android:title="默认禁言时长（分钟）"
+            android:defaultValue="10" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="表情面板">
+        <SwitchPreferenceCompat
+            android:key="emoji_panel"
+            android:title="表情面板"
+            android:summary="聊天输入栏左侧增加表情面板入口"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="emoji_kaomoji"
+            android:title="启用颜文字分类"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="emoji_recent"
+            android:title="最近使用置顶"
+            android:defaultValue="true" />
+    </PreferenceCategory>
+
+    <!-- ===================== 显示与界面 ===================== -->
+    <PreferenceCategory android:title="显示与界面">
+        <EditTextPreference
+            android:key="preview_font_size"
+            android:title="篡改预览字体大小"
+            android:summary="聊天/空间预览使用的字体大小（sp）"
+            android:defaultValue="18" />
+        <SwitchPreferenceCompat
+            android:key="force_tablet"
+            android:title="强制平板模式"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="force_phone"
+            android:title="强制手机模式"
+            android:defaultValue="false" />
+        <EditTextPreference
+            android:key="modify_dpi"
+            android:title="修改 DPI"
+            android:summary="覆盖系统 DPI（留空表示不修改）"
+            android:defaultValue="" />
+        <SwitchPreferenceCompat
+            android:key="force_default_font"
+            android:title="强制使用默认字体"
+            android:summary="忽略 QQ 内置字体，使用系统默认"
+            android:defaultValue="false" />
+        <EditTextPreference
+            android:key="splash_columns"
+            android:title="自定义启动图列数"
+            android:summary="动态/表情面板启动图的列数"
+            android:defaultValue="4" />
+        <SwitchPreferenceCompat
+            android:key="random_bubble"
+            android:title="随机气泡"
+            android:summary="每次发送随机使用不同气泡样式"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="custom_emoji_panel"
+            android:title="自定义表情面板"
+            android:summary="启用可编辑/上传的表情面板"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="transparent_avatar"
+            android:title="允许透明头像/表情"
+            android:summary="上传时跳过圆角裁切与底色填充"
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+    <!-- ===================== 隐私与去广告 ===================== -->
+    <PreferenceCategory android:title="隐私与去广告">
+        <SwitchPreferenceCompat
+            android:key="disable_qqshow"
+            android:title="禁用 QQ 秀"
+            android:summary="关闭个人资料中的 QQ 秀展示"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="hide_qzone_ad"
+            android:title="隐藏 QQ 空间广告"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="hide_emoji_reaction"
+            android:title="隐藏表情表态"
+            android:summary="不显示他人对消息的表情表态"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="remove_msg_reaction"
+            android:title="移除消息表态"
+            android:summary="彻底关闭消息表态功能入口"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="remove_top_banner_ad"
+            android:title="移除顶栏横幅广告"
+            android:summary="移除消息列表顶部的横幅推广"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="disable_crash_report"
+            android:title="禁用崩溃日志上报"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="disable_subchannel_notify"
+            android:title="禁用子渠道通知"
+            android:summary="关闭公众号/子渠道推送通知"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="disable_notify_bubble"
+            android:title="禁用通知气泡"
+            android:summary="关闭悬浮通知气泡"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="disable_interactive_popup"
+            android:title="禁用交互式弹窗"
+            android:summary="屏蔽特定消息触发的互动弹窗"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="use_system_gallery"
+            android:title="使用系统相册"
+            android:summary="选图/发图时调用系统相册而非 QQ 内置"
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+    <!-- ===================== 社交与功能 ===================== -->
+    <PreferenceCategory android:title="社交与功能">
+        <SwitchPreferenceCompat
+            android:key="show_qzone_feed"
+            android:title="显示空间动态"
+            android:summary="在对应入口直接展示 QQ 空间动态"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="at_list_reorder"
+            android:title="@列表重新排序"
+            android:summary="按活跃度/群昵称重排 @ 成员列表"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="disable_swipe_vibrate"
+            android:title="禁用左滑回复震动"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="forward_no_limit"
+            android:title="去除转发人数限制"
+            android:summary="解除转发时 9 名联系人上限"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="msg_plus_one"
+            android:title="消息 +1 Plus"
+            android:summary="消息列表数字角标 +1 增强显示"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="remove_reaction_limit"
+            android:title="移除表情回应限制"
+            android:summary="解除单条消息可加的表情回应数量上限"
+            android:defaultValue="false" />
+        <EditTextPreference
+            android:key="tamper_steps"
+            android:title="篡改上传运动步数"
+            android:summary="上报到 QQ 运动的步数（留空表示不改）"
+            android:defaultValue="" />
+        <SwitchPreferenceCompat
+            android:key="miniapp_to_link"
+            android:title="小程序分享转链接"
+            android:summary="接收小程序分享时转为网页链接"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="card_to_text"
+            android:title="卡片消息文本化"
+            android:summary="把卡片/分享消息渲染为纯文本"
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+    <!-- ===================== 模块 ===================== -->
+    <PreferenceCategory android:title="模块">
+        <SwitchPreferenceCompat
+            android:key="auto_pull"
+            android:title="自动拉取"
+            android:summary="启动时自动拉取仓库内最新 hook 配置，跨版本免重装适配"
+            android:defaultValue="true" />
+        <EditTextPreference
+            android:key="auto_pull_url"
+            android:title="自动拉取地址"
+            android:summary="hook_config.json 的 raw 地址（默认指向本仓库）"
+            android:defaultValue="https://raw.githubusercontent.com/NekoAiDev/NekoQQ/main/app/src/main/assets/hook_config.json" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

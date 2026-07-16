@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "note": "由 NekoQQ 自动拉取。把命中更好的 hook 点位填到这里即可跨 QQ 版本免重装。overrides 的 key 必须与代码中的 featureKey 一致（见各 features/*.kt 与 QQConfig.kt）。",
+  "overrides": {
+    "preview_font_size": [
+      { "clazz": "com.tencent.mobileqq.text.QQText", "method": "getPaint", "paramTypes": [] }
+    ],
+    "force_tablet": [
+      { "clazz": "com.tencent.mobileqq.activity.SplashActivity", "method": "isTablet", "paramTypes": [] }
+    ],
+    "forward_no_limit": [
+      { "clazz": "com.tencent.mobileqq.activity.ForwardRecentActivity", "method": "getMaxForwardCount", "paramTypes": [] }
+    ],
+    "msg_plus_one": [
+      { "clazz": "com.tencent.mobileqq.activity.recent.RecentAdapter", "method": "getUnreadCount", "paramTypes": [] }
+    ]
+  }
+}

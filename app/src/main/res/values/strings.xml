@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NekoQQ</string>
+    <string name="neko_settings_title">Neko设置</string>
+    <string name="neko_settings_subtitle">NekoQQ 增强模块</string>
+</resources>
