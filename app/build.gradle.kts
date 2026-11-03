@@ -36,7 +36,7 @@ android {
 }
 
 dependencies {
-    // 引入 Xposed 模块开发依赖（仓库源已在根目录统一托管）
+    // Xposed 模块 API 依赖
     compileOnly("de.robv.android.xposed:api:82")
 
     implementation("androidx.core:core-ktx:1.12.0")
@@ -46,4 +46,3 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
-
