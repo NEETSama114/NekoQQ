@@ -17,11 +17,14 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Build with Gradle
-      run: gradle assembleDebug
+    - name: Add Xposed Maven Repository & Build
+      run: |
+        mkdir -p ~/.gradle
+        echo "allprojects { repositories { maven { url 'https://api.xposed.info/' } } }" >> ~/.gradle/init.gradle
+        gradle assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: NekoQQ-debug
-        path: app/build/outputs/apk/debug/*.apk
+        path: '**/build/outputs/apk/debug/*.apk'
