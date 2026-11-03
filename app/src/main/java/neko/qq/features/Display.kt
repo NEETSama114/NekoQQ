@@ -5,6 +5,7 @@ import de.robv.android.xposed.XposedBridge
 import neko.qq.constants.QQConfig
 import neko.qq.util.Hooker
 import neko.qq.util.Prefs
+import neko.qq.util.Contexts // 👈 增加这一行，修复 Unresolved reference: Contexts
 
 /**
  * 显示与界面相关增强：
