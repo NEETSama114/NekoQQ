@@ -33,7 +33,8 @@ object Views {
         var p = view?.parent
         while (p is View) {
             if (predicate(p)) return p
-            p = p.parent
+            // ✅ 修复报错：加上 (p as View) 强制指定为 View 的 parent，消除属性歧义
+            p = (p as View).parent 
         }
         return null
     }
