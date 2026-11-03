@@ -1,6 +1,8 @@
 package neko.qq
 
-import de.robv.android.xposed.IXposedMod
+// ❌ 原来错误的引入：import de.robv.android.xposed.IXposedMod
+// ✅ 正确的引入：
+import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import neko.qq.constants.QQConfig
@@ -18,7 +20,9 @@ import neko.qq.util.Contexts
  * NekoQQ 模块入口（被 assets/xposed_init 引用）。
  * 仅在 QQ 进程内生效，按顺序挂载：自动拉取配置 → Neko设置入口 → 全部功能。
  */
-class MainHook : IXposedMod {
+// ❌ 原来错误的继承：class MainHook : IXposedMod
+// ✅ 正确的继承：必须实现 IXposedHookLoadPackage 接口
+class MainHook : IXposedHookLoadPackage {
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         if (lpparam.packageName != QQConfig.PACKAGE_QQ) return
