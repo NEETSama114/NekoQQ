@@ -1,7 +1,7 @@
 package neko.qq.util
 
 import android.content.Context
-import android.app.ActivityThread
+// ❌ 删除了 import android.app.ActivityThread，因为这是隐藏 API，直接 import 会导致编译失败
 
 /**
  * 跨进程取 Context 的小工具。
@@ -12,6 +12,7 @@ object Contexts {
 
     /** 当前应用（QQ）的 Application Context */
     fun appContext(): Context {
+        // ✅ 使用反射获取，完全不受影响
         val at = Class.forName("android.app.ActivityThread")
         val m = at.getMethod("currentApplication")
         return m.invoke(null) as Context
