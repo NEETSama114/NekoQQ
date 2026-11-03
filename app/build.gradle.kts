@@ -35,14 +35,8 @@ android {
     }
 }
 
-repositories {
-    google()
-    mavenCentral()
-    maven(url = "https://api.xposed.info/")
-}
-
 dependencies {
-    // 显式引入 Xposed API 依赖，解决 Unresolved reference 报错
+    // 引入 Xposed 模块开发依赖（仓库源已在根目录统一托管）
     compileOnly("de.robv.android.xposed:api:82")
 
     implementation("androidx.core:core-ktx:1.12.0")
@@ -52,3 +46,4 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
+
