@@ -17,10 +17,25 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Add Xposed Maven Repository & Build
+    - name: Inject Repositories & Build
       run: |
-        mkdir -p ~/.gradle
-        echo "allprojects { repositories { maven { url 'https://api.xposed.info/' } } }" >> ~/.gradle/init.gradle
+        # 寻找并向 settings.gradle 或 settings.gradle.kts 中注入仓库源
+        SETTINGS_FILE=$(find . -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
+        if [ -f "$SETTINGS_FILE" ]; then
+          echo "Injecting repositories into $SETTINGS_FILE"
+          sed -i 's/RepositoriesMode.FAIL_ON_PROJECT_REPOS/RepositoriesMode.PREFER_PROJECT/g' "$SETTINGS_FILE"
+          cat << 'EOF' >> "$SETTINGS_FILE"
+
+        dependencyResolutionManagement {
+            repositories {
+                google()
+                mavenCentral()
+                maven { url 'https://api.xposed.info/' }
+            }
+        }
+        EOF
+        fi
+        
         gradle assembleDebug
 
     - name: Upload APK
