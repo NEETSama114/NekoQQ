@@ -18,10 +18,7 @@ jobs:
         cache: gradle
 
     - name: Build with Gradle
-      run: |
-        mkdir -p ~/.gradle
-        echo "allprojects { repositories { google(); mavenCentral(); maven { url 'https://api.xposed.info/' } } }" >> ~/.gradle/init.gradle
-        gradle :app:assembleDebug
+      run: gradle :app:assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
