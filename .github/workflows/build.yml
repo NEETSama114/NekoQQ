@@ -19,15 +19,15 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # 2. 配置指定的 Gradle 环境，强制使用与 AGP 8.4 匹配的 8.6 版本
+      # 2. 配置指定的 Gradle 环境，使用 8.9 版本以满足 AGP 8.2.2 的要求
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.6'
+          gradle-version: '8.9'
 
       # 3. 核心：由于仓库缺失文件，让云端自动生成 Wrapper 脚本
       - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version 8.6
+        run: gradle wrapper --gradle-version 8.9
 
       # 4. 赋予执行权限，并开启详细日志进行编译
       - name: Build with Gradle
