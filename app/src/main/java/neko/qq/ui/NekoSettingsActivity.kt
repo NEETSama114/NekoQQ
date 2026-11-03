@@ -15,10 +15,13 @@ class NekoSettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_neko_settings)
 
+        // 初始化 Toolbar，配置返回按钮
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
         toolbar.setNavigationOnClickListener { finish() }
 
+        // 加载设置 Fragment
+        // 注意：这里的 R.id.container 必须和你 activity_neko_settings.xml 中的 Fragment 容器 ID 一致
         supportFragmentManager
             .beginTransaction()
             .replace(R.id.container, NekoSettingsFragment())
