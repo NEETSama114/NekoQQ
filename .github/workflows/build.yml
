@@ -1,0 +1,44 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Inject Repositories & Build
+      run: |
+        SETTINGS_FILE=$(find . -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
+        if [ -f "$SETTINGS_FILE" ]; then
+          echo "Injecting repositories into $SETTINGS_FILE"
+          sed -i 's/RepositoriesMode.FAIL_ON_PROJECT_REPOS/RepositoriesMode.PREFER_PROJECT/g' "$SETTINGS_FILE"
+          cat << 'EOF' >> "$SETTINGS_FILE"
+
+        dependencyResolutionManagement {
+            repositories {
+                google()
+                mavenCentral()
+                maven(url = "https://api.xposed.info/")
+            }
+        }
+        EOF
+        fi
+        
+        gradle assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: NekoQQ-debug
+        path: '**/build/outputs/apk/debug/*.apk'
