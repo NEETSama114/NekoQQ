@@ -17,11 +17,13 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Build with Gradle
+    - name: Build with Gradle Wrapper
       run: |
+        # 使用项目自带的 gradlew 编译，并在全局仓库中强行加入 xposed 源
         mkdir -p ~/.gradle
         echo "allprojects { repositories { google(); mavenCentral(); maven { url 'https://api.xposed.info/' } } }" >> ~/.gradle/init.gradle
-        gradle assembleDebug
+        chmod +x ./gradlew
+        ./gradlew assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
