@@ -1,57 +1,44 @@
 
-package neko.qq.hooks
+package neko.qq.hook
 
 import android.app.Activity
 import android.app.Application
+import android.content.ComponentName
 import android.content.Intent
-import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.callbacks.XC_LoadPackage
-import neko.qq.constants.QQConfig
-import neko.qq.util.Views
 
-/**
- * 动态监听 QQ Activity 生命周期。
- *
- * 不再依赖 QQ 内部设置页混淆类名。
- * 当 Activity 恢复到前台时，延迟检查页面布局，
- * 找到「账号与安全」后注入 Neko设置入口。
- */
+import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.XposedHelpers
+import de.robv.android.xposed.callbacks.XC_LoadPackage
+
 object InjectSettingsEntry {
 
-    private const val ROW_TAG = "neko_settings_row"
-    private const val INJECT_DELAY = 700L
+    private const val TAG = "NekoQQ-InjectSettingsEntry"
+
+    private const val TARGET_TEXT = "账号与安全"
+    private const val ENTRY_TEXT = "Neko设置"
+
+    private const val ENTRY_TAG = "neko_qq_settings_entry"
 
     /**
-     * 注册 Activity 生命周期监听器。
+     * 注册 Activity 生命周期回调。
      *
-     * 仅在 QQ 主进程注册。
+     * 注意：第一个参数是 Application，不是 ClassLoader。
      */
     fun hook(
         application: Application,
         lpparam: XC_LoadPackage.LoadPackageParam
     ) {
-        if (lpparam.packageName != QQConfig.PACKAGE_QQ) {
+        if (lpparam.packageName != "com.tencent.mobileqq") {
             return
         }
 
-        if (lpparam.processName != QQConfig.PACKAGE_QQ) {
-            XposedBridge.log(
-                "[NekoQQ] 非主进程，跳过设置入口监听: ${lpparam.processName}"
-            )
-            return
-        }
-
-        XposedBridge.log(
-            "[NekoQQ] 注册 Activity 生命周期监听器"
-        )
+        XposedBridge.log("$TAG: 注册 ActivityLifecycleCallbacks")
 
         application.registerActivityLifecycleCallbacks(
             object : Application.ActivityLifecycleCallbacks {
@@ -60,311 +47,258 @@ object InjectSettingsEntry {
                     activity: Activity,
                     savedInstanceState: Bundle?
                 ) {
-                    // 不在创建时注入，等待页面恢复前台
                 }
 
-                override fun onActivityStarted(
-                    activity: Activity
-                ) {
-                    // 无操作
+                override fun onActivityStarted(activity: Activity) {
                 }
 
-                override fun onActivityResumed(
-                    activity: Activity
-                ) {
-                    val decorView =
-                        activity.window?.decorView ?: return
+                override fun onActivityResumed(activity: Activity) {
+                    try {
+                        val decorView = activity.window?.decorView ?: return
 
-                    decorView.postDelayed({
+                        decorView.postDelayed({
+                            try {
+                                injectRow(activity)
+                            } catch (t: Throwable) {
+                                XposedBridge.log(
+                                    "$TAG: injectRow异常: ${t.stackTraceToString()}"
+                                )
+                            }
+                        }, 700)
 
-                        if (activity.isFinishing || activity.isDestroyed) {
-                            return@postDelayed
-                        }
-
-                        runCatching {
-                            injectRow(activity)
-                        }.onFailure {
-                            XposedBridge.log(
-                                "[NekoQQ] 动态注入 Neko设置失败:\n" +
-                                    it.stackTraceToString()
-                            )
-                        }
-
-                    }, INJECT_DELAY)
+                    } catch (t: Throwable) {
+                        XposedBridge.log(
+                            "$TAG: onActivityResumed异常: ${t.stackTraceToString()}"
+                        )
+                    }
                 }
 
-                override fun onActivityPaused(
-                    activity: Activity
-                ) {
-                    // 无操作
+                override fun onActivityPaused(activity: Activity) {
                 }
 
-                override fun onActivityStopped(
-                    activity: Activity
-                ) {
-                    // 无操作
+                override fun onActivityStopped(activity: Activity) {
                 }
 
                 override fun onActivitySaveInstanceState(
                     activity: Activity,
                     outState: Bundle
                 ) {
-                    // 无操作
                 }
 
-                override fun onActivityDestroyed(
-                    activity: Activity
-                ) {
-                    // 无操作
+                override fun onActivityDestroyed(activity: Activity) {
                 }
             }
         )
-
-        XposedBridge.log(
-            "[NekoQQ] Activity 生命周期监听器注册成功"
-        )
     }
 
     /**
-     * 尝试在当前 Activity 中插入入口。
+     * 在设置页面中插入 Neko设置 入口。
      */
     private fun injectRow(activity: Activity) {
-
-        val root =
-            activity.findViewById<ViewGroup>(android.R.id.content)
-                ?: return
-
-        val target =
-            Views.findTextViewWithText(
-                root,
-                QQConfig.ACCOUNT_SECURITY_TEXT
-            ) ?: return
-
-        val row =
-            Views.findClickableRow(target) ?: return
-
-        val parent =
-            row.parent as? ViewGroup ?: return
-
-        // 防止重复注入
-        if (Views.hasInjected(parent, ROW_TAG)) {
+        if (activity.isFinishing || activity.isDestroyed) {
             return
         }
 
-        val index = parent.indexOfChild(row)
+        val decorView = activity.window?.decorView ?: return
 
-        if (index < 0) {
+        // 防止重复插入
+        if (decorView.findViewWithTag<View>(ENTRY_TAG) != null) {
             return
         }
 
-        val nekoRow = buildNekoRow(activity)
-
-        parent.addView(nekoRow, index)
-
-        XposedBridge.log(
-            "[NekoQQ] 已插入 Neko设置入口，Activity=${activity.javaClass.name}"
+        val targetTextView = findTextView(
+            decorView as? ViewGroup ?: return,
+            TARGET_TEXT
         )
+
+        if (targetTextView == null) {
+            XposedBridge.log(
+                "$TAG: 当前Activity未找到文本：$TARGET_TEXT，Activity=${activity.javaClass.name}"
+            )
+            return
+        }
+
+        val targetRow = findVerticalParent(targetTextView)
+
+        if (targetRow == null) {
+            XposedBridge.log(
+                "$TAG: 未找到目标文本对应的垂直LinearLayout"
+            )
+            return
+        }
+
+        val parent = targetRow.parent as? ViewGroup
+
+        if (parent == null) {
+            XposedBridge.log(
+                "$TAG: 目标行没有有效的父容器"
+            )
+            return
+        }
+
+        val targetIndex = parent.indexOfChild(targetRow)
+
+        if (targetIndex < 0) {
+            XposedBridge.log(
+                "$TAG: 无法获取目标行的位置"
+            )
+            return
+        }
+
+        val entryView = createEntryView(
+            activity,
+            targetTextView
+        )
+
+        try {
+            parent.addView(entryView, targetIndex)
+
+            XposedBridge.log(
+                "$TAG: 成功插入 Neko设置，Activity=${activity.javaClass.name}"
+            )
+
+        } catch (t: Throwable) {
+            XposedBridge.log(
+                "$TAG: 插入入口失败: ${t.stackTraceToString()}"
+            )
+        }
     }
 
     /**
-     * 创建 Neko设置入口。
+     * 创建 Neko设置 入口。
      */
-    private fun buildNekoRow(
-        activity: Activity
-    ): LinearLayout {
+    private fun createEntryView(
+        activity: Activity,
+        referenceTextView: TextView
+    ): TextView {
 
-        val row = LinearLayout(activity).apply {
+        val entry = TextView(activity)
 
-            orientation = LinearLayout.HORIZONTAL
+        entry.text = ENTRY_TEXT
+        entry.tag = ENTRY_TAG
 
-            gravity = Gravity.CENTER_VERTICAL
+        entry.gravity = Gravity.CENTER_VERTICAL
 
-            setPadding(
-                dp(activity, 16),
-                dp(activity, 14),
-                dp(activity, 16),
-                dp(activity, 14)
-            )
+        entry.textSize = referenceTextView.textSize / activity.resources.displayMetrics.scaledDensity
 
-            tag = ROW_TAG
+        entry.setTextColor(referenceTextView.currentTextColor)
 
-            isClickable = true
-            isFocusable = true
+        entry.typeface = referenceTextView.typeface
 
-            background = pressSelector(activity)
+        entry.setPadding(
+            referenceTextView.paddingLeft,
+            referenceTextView.paddingTop,
+            referenceTextView.paddingRight,
+            referenceTextView.paddingBottom
+        )
 
-            minimumHeight = dp(activity, 56)
+        entry.isClickable = true
+        entry.isFocusable = true
+
+        entry.background = referenceTextView.background?.constantState?.newDrawable()?.mutate()
+
+        val referenceHeight = referenceTextView.height
+
+        val height = if (referenceHeight > 0) {
+            referenceHeight
+        } else {
+            dp(activity, 56)
         }
 
-        // 图标
-        val icon = TextView(activity).apply {
+        entry.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            height
+        )
 
-            text = "🌸"
-
-            textSize = 20f
-
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    dp(activity, 28),
-                    dp(activity, 28)
-                ).apply {
-                    marginEnd = dp(activity, 14)
+        entry.setOnClickListener {
+            try {
+                val intent = Intent().apply {
+                    component = ComponentName(
+                        "neko.qq",
+                        "neko.qq.ui.NekoSettingsActivity"
+                    )
                 }
-
-            gravity = Gravity.CENTER
-        }
-
-        // 标题
-        val title = TextView(activity).apply {
-
-            text = "Neko设置"
-
-            textSize = 16f
-
-            setTextColor(
-                Color.parseColor("#E6EDF3")
-            )
-
-            typeface = Typeface.DEFAULT_BOLD
-
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-        }
-
-        // 标签
-        val badge = TextView(activity).apply {
-
-            text = "NekoQQ"
-
-            textSize = 10f
-
-            setTextColor(Color.WHITE)
-
-            setPadding(
-                dp(activity, 6),
-                dp(activity, 2),
-                dp(activity, 6),
-                dp(activity, 2)
-            )
-
-            background =
-                roundBg(
-                    activity,
-                    Color.parseColor("#FF6FA5")
-                )
-
-            gravity = Gravity.CENTER
-        }
-
-        // 箭头
-        val chevron = ImageView(activity).apply {
-
-            setImageResource(
-                android.R.drawable.ic_media_play
-            )
-
-            setColorFilter(
-                Color.parseColor("#8B949E")
-            )
-
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    dp(activity, 16),
-                    dp(activity, 16)
-                ).apply {
-                    marginStart = dp(activity, 10)
-                }
-        }
-
-        row.addView(icon)
-        row.addView(title)
-        row.addView(badge)
-        row.addView(chevron)
-
-        // 点击跳转
-        row.setOnClickListener {
-
-            runCatching {
-
-                val intent = Intent().setClassName(
-                    "neko.qq",
-                    "neko.qq.ui.NekoSettingsActivity"
-                )
-
-                intent.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK
-                )
 
                 activity.startActivity(intent)
 
-            }.onFailure {
-
                 XposedBridge.log(
-                    "[NekoQQ] 打开 NekoSettingsActivity 失败:\n" +
-                        it.stackTraceToString()
+                    "$TAG: 点击 Neko设置，尝试启动 NekoSettingsActivity"
+                )
+
+            } catch (t: Throwable) {
+                XposedBridge.log(
+                    "$TAG: 启动 NekoSettingsActivity 失败: ${t.stackTraceToString()}"
                 )
             }
         }
 
-        return row
+        return entry
     }
 
     /**
-     * dp 转换。
+     * 递归查找指定文本的 TextView。
      */
+    private fun findTextView(
+        root: ViewGroup,
+        targetText: String
+    ): TextView? {
+
+        for (i in 0 until root.childCount) {
+            val child = root.getChildAt(i)
+
+            if (child is TextView) {
+                if (child.text?.toString()?.trim() == targetText) {
+                    return child
+                }
+            }
+
+            if (child is ViewGroup) {
+                val result = findTextView(child, targetText)
+
+                if (result != null) {
+                    return result
+                }
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * 从目标 TextView 向上寻找垂直 LinearLayout。
+     *
+     * 这个容器用于放置新入口。
+     */
+    private fun findVerticalParent(
+        target: TextView
+    ): ViewGroup? {
+
+        var current: View? = target
+
+        repeat(5) {
+            val parent = current?.parent as? ViewGroup ?: return null
+
+            if (
+                parent is LinearLayout &&
+                parent.orientation == LinearLayout.VERTICAL
+            ) {
+                val grandParent = parent.parent
+
+                if (grandParent is ViewGroup) {
+                    return parent
+                }
+            }
+
+            current = parent
+        }
+
+        return null
+    }
+
     private fun dp(
         activity: Activity,
         value: Int
     ): Int {
-        return (
-            value *
-                activity.resources.displayMetrics.density
-            ).toInt()
-    }
-
-    /**
-     * 点击背景。
-     */
-    private fun pressSelector(
-        activity: Activity
-    ): android.graphics.drawable.StateListDrawable {
-
-        return android.graphics.drawable.StateListDrawable().apply {
-
-            addState(
-                intArrayOf(android.R.attr.state_pressed),
-                android.graphics.drawable.ColorDrawable(
-                    Color.parseColor("#232B3A")
-                )
-            )
-
-            addState(
-                intArrayOf(),
-                android.graphics.drawable.ColorDrawable(
-                    Color.parseColor("#1C2230")
-                )
-            )
-        }
-    }
-
-    /**
-     * 圆角背景。
-     */
-    private fun roundBg(
-        activity: Activity,
-        color: Int
-    ): android.graphics.drawable.GradientDrawable {
-
-        return android.graphics.drawable.GradientDrawable().apply {
-
-            setColor(color)
-
-            cornerRadius =
-                dp(activity, 20).toFloat()
-        }
+        return (value * activity.resources.displayMetrics.density + 0.5f).toInt()
     }
 }
