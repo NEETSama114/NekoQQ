@@ -1,9 +1,12 @@
+
 package neko.qq
 
-// ❌ 原来错误的引入：import de.robv.android.xposed.IXposedMod
-// ✅ 正确的引入：
+import android.app.Application
+import android.content.Context
 import de.robv.android.xposed.IXposedHookLoadPackage
+import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import neko.qq.constants.QQConfig
 import neko.qq.features.AntiRecall
@@ -15,42 +18,79 @@ import neko.qq.features.Privacy
 import neko.qq.features.Social
 import neko.qq.hooks.InjectSettingsEntry
 import neko.qq.util.Contexts
+import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * NekoQQ 模块入口（被 assets/xposed_init 引用）。
- * 仅在 QQ 进程内生效，按顺序挂载：自动拉取配置 → Neko设置入口 → 全部功能。
- */
-// ❌ 原来错误的继承：class MainHook : IXposedMod
-// ✅ 正确的继承：必须实现 IXposedHookLoadPackage 接口
 class MainHook : IXposedHookLoadPackage {
 
-    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
+    private val initialized = AtomicBoolean(false)
+
+    override fun handleLoadPackage(
+        lpparam: XC_LoadPackage.LoadPackageParam
+    ) {
         if (lpparam.packageName != QQConfig.PACKAGE_QQ) return
 
-        // 提前拿到 QQ 的 Application Context，供 Prefs / Toasts 等工具使用
-        runCatching { Contexts.appContext() }.onFailure {
-            XposedBridge.log("[NekoQQ] 获取 Context 失败: ${it.message}")
-        }
+        XposedBridge.log(
+            "[NekoQQ] 等待 Application.attach: ${lpparam.processName}"
+        )
 
-        XposedBridge.log("[NekoQQ] 注入 QQ 进程 (${lpparam.processName})")
+        XposedHelpers.findAndHookMethod(
+            Application::class.java,
+            "attach",
+            Context::class.java,
+            object : XC_MethodHook() {
 
-        // 0) 自动拉取：先同步应用本地缓存，使上次拉取的 hook 覆盖立即生效
-        AutoPull.init()
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (!initialized.compareAndSet(false, true)) return
 
-        // 1) Neko设置入口（位于「账号与安全」上方）
-        InjectSettingsEntry.hook(lpparam.classLoader, lpparam)
+                    val app = param.thisObject as Application
 
-        // 2) 消息 / 群管 / 表情 三大基础功能
-        AntiRecall.hook(lpparam.classLoader, lpparam)
-        GroupManager.hook(lpparam.classLoader, lpparam)
-        EmojiPanel.hook(lpparam.classLoader, lpparam)
+                    runCatching {
+                        Contexts.initialize(app)
+                        XposedBridge.log("[NekoQQ] Application Context 初始化成功")
 
-        // 3) 显示与界面 / 隐私去广告 / 社交功能 增强
-        Display.hook(lpparam.classLoader, lpparam)
-        Privacy.hook(lpparam.classLoader, lpparam)
-        Social.hook(lpparam.classLoader, lpparam)
+                        initializeHooks(lpparam)
+                    }.onFailure {
+                        XposedBridge.log(
+                            "[NekoQQ] 初始化异常: ${it.stackTraceToString()}"
+                        )
+                    }
+                }
+            }
+        )
+    }
 
-        // 4) 后台刷新最新 hook 配置（下次启动生效）
-        AutoPull.refresh()
+    private fun initializeHooks(
+        lpparam: XC_LoadPackage.LoadPackageParam
+    ) {
+        val loader = lpparam.classLoader
+
+        XposedBridge.log(
+            "[NekoQQ] 开始初始化功能: ${lpparam.processName}"
+        )
+
+        runCatching { AutoPull.init() }
+            .onFailure {
+                XposedBridge.log("[NekoQQ] AutoPull.init 失败: $it")
+            }
+
+        runCatching { InjectSettingsEntry.hook(loader, lpparam) }
+            .onFailure {
+                XposedBridge.log("[NekoQQ] 设置入口 Hook 失败: $it")
+            }
+
+        runCatching { AntiRecall.hook(loader, lpparam) }
+        runCatching { GroupManager.hook(loader, lpparam) }
+        runCatching { EmojiPanel.hook(loader, lpparam) }
+
+        runCatching { Display.hook(loader, lpparam) }
+        runCatching { Privacy.hook(loader, lpparam) }
+        runCatching { Social.hook(loader, lpparam) }
+
+        runCatching { AutoPull.refresh() }
+            .onFailure {
+                XposedBridge.log("[NekoQQ] AutoPull.refresh 失败: $it")
+            }
+
+        XposedBridge.log("[NekoQQ] 功能初始化流程结束")
     }
 }
