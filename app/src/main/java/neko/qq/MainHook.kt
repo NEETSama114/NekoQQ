@@ -3,94 +3,151 @@ package neko.qq
 
 import android.app.Application
 import android.content.Context
+
 import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import neko.qq.constants.QQConfig
-import neko.qq.features.AntiRecall
-import neko.qq.features.AutoPull
-import neko.qq.features.Display
-import neko.qq.features.EmojiPanel
-import neko.qq.features.GroupManager
-import neko.qq.features.Privacy
-import neko.qq.features.Social
-import neko.qq.hooks.InjectSettingsEntry
-import neko.qq.util.Contexts
+
 import java.util.concurrent.atomic.AtomicBoolean
+
+import neko.qq.hook.InjectSettingsEntry
 
 class MainHook : IXposedHookLoadPackage {
 
-    private val initialized = AtomicBoolean(false)
+    companion object {
+        private const val TAG = "NekoQQ-MainHook"
+
+        private val initialized = AtomicBoolean(false)
+    }
 
     override fun handleLoadPackage(
         lpparam: XC_LoadPackage.LoadPackageParam
     ) {
-        if (lpparam.packageName != QQConfig.PACKAGE_QQ) return
+        if (lpparam.packageName != "com.tencent.mobileqq") {
+            return
+        }
 
-        XposedBridge.log(
-            "[NekoQQ] 等待 Application.attach: ${lpparam.processName}"
-        )
+        XposedBridge.log("$TAG: QQ进程加载")
 
-        XposedHelpers.findAndHookMethod(
-            Application::class.java,
-            "attach",
-            Context::class.java,
-            object : XC_MethodHook() {
+        try {
+            XposedHelpers.findAndHookMethod(
+                Application::class.java,
+                "attach",
+                Context::class.java,
+                object : XC_MethodHook() {
 
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!initialized.compareAndSet(false, true)) return
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val app = param.thisObject as? Application
+                            ?: return
 
-                    val app = param.thisObject as Application
+                        if (!initialized.compareAndSet(false, true)) {
+                            return
+                        }
 
-                    runCatching {
-                        Contexts.initialize(app)
-                        XposedBridge.log("[NekoQQ] Application Context 初始化成功")
+                        try {
+                            Contexts.initialize(app)
 
-                        initializeHooks(lpparam)
-                    }.onFailure {
-                        XposedBridge.log(
-                            "[NekoQQ] 初始化异常: ${it.stackTraceToString()}"
-                        )
+                            XposedBridge.log(
+                                "$TAG: Application.attach完成"
+                            )
+
+                            initializeHooks(
+                                app,
+                                lpparam
+                            )
+
+                        } catch (t: Throwable) {
+                            XposedBridge.log(
+                                "$TAG: 初始化异常: ${t.stackTraceToString()}"
+                            )
+                        }
                     }
                 }
-            }
-        )
+            )
+
+        } catch (t: Throwable) {
+            XposedBridge.log(
+                "$TAG: Hook Application.attach失败: ${t.stackTraceToString()}"
+            )
+        }
     }
 
     private fun initializeHooks(
+        app: Application,
         lpparam: XC_LoadPackage.LoadPackageParam
     ) {
         val loader = lpparam.classLoader
 
-        XposedBridge.log(
-            "[NekoQQ] 开始初始化功能: ${lpparam.processName}"
-        )
+        XposedBridge.log("$TAG: 开始初始化模块")
 
-        runCatching { AutoPull.init() }
-            .onFailure {
-                XposedBridge.log("[NekoQQ] AutoPull.init 失败: $it")
-            }
+        // 自动拉取
+        runCatching {
+            AutoPull.init()
+        }.onFailure {
+            XposedBridge.log("$TAG: AutoPull.init失败: $it")
+        }
 
-        runCatching { InjectSettingsEntry.hook(loader, lpparam) }
-            .onFailure {
-                XposedBridge.log("[NekoQQ] 设置入口 Hook 失败: $it")
-            }
+        // 设置页入口
+        runCatching {
+            InjectSettingsEntry.hook(
+                app,
+                lpparam
+            )
+        }.onFailure {
+            XposedBridge.log("$TAG: InjectSettingsEntry失败: $it")
+        }
 
-        runCatching { AntiRecall.hook(loader, lpparam) }
-        runCatching { GroupManager.hook(loader, lpparam) }
-        runCatching { EmojiPanel.hook(loader, lpparam) }
+        // 撤回消息
+        runCatching {
+            AntiRecall.hook(loader)
+        }.onFailure {
+            XposedBridge.log("$TAG: AntiRecall失败: $it")
+        }
 
-        runCatching { Display.hook(loader, lpparam) }
-        runCatching { Privacy.hook(loader, lpparam) }
-        runCatching { Social.hook(loader, lpparam) }
+        // 群管理
+        runCatching {
+            GroupManager.hook(loader)
+        }.onFailure {
+            XposedBridge.log("$TAG: GroupManager失败: $it")
+        }
 
-        runCatching { AutoPull.refresh() }
-            .onFailure {
-                XposedBridge.log("[NekoQQ] AutoPull.refresh 失败: $it")
-            }
+        // 表情面板
+        runCatching {
+            EmojiPanel.hook(loader)
+        }.onFailure {
+            XposedBridge.log("$TAG: EmojiPanel失败: $it")
+        }
 
-        XposedBridge.log("[NekoQQ] 功能初始化流程结束")
+        // 显示相关
+        runCatching {
+            Display.hook(loader)
+        }.onFailure {
+            XposedBridge.log("$TAG: Display失败: $it")
+        }
+
+        // 隐私功能
+        runCatching {
+            Privacy.hook(loader)
+        }.onFailure {
+            XposedBridge.log("$TAG: Privacy失败: $it")
+        }
+
+        // 社交功能
+        runCatching {
+            Social.hook(loader)
+        }.onFailure {
+            XposedBridge.log("$TAG: Social失败: $it")
+        }
+
+        // 刷新自动拉取
+        runCatching {
+            AutoPull.refresh()
+        }.onFailure {
+            XposedBridge.log("$TAG: AutoPull.refresh失败: $it")
+        }
+
+        XposedBridge.log("$TAG: 模块初始化完成")
     }
 }
