@@ -9,7 +9,8 @@ object Contexts {
     private var applicationContext: Context? = null
 
     fun initialize(context: Context) {
-        applicationContext = context.applicationContext
+        // 直接保存 Application 对象
+        applicationContext = context
     }
 
     fun appContext(): Context {
