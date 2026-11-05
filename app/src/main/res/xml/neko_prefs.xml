@@ -215,7 +215,7 @@
             android:key="auto_pull_url"
             android:title="自动拉取地址"
             android:summary="hook_config.json 的 raw 地址（默认指向本仓库）"
-            android:defaultValue="https://raw.githubusercontent.com/NekoAiDev/NekoQQ/main/app/src/main/assets/hook_config.json" />
+            android:defaultValue="https://raw.githubusercontent.com/NEETSama114/NekoQQ/main/app/src/main/assets/hook_config.json" />
     </PreferenceCategory>
 
 </PreferenceScreen>
