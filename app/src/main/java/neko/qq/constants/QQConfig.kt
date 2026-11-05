@@ -186,7 +186,7 @@ object QQConfig {
 
     /** 自动拉取：默认仓库内 hook 配置地址（可被设置项覆盖） */
     const val DEFAULT_HOOK_CONFIG_URL =
-        "https://raw.githubusercontent.com/NEETSama114/NekoQQ/main/app/src/main/assets/hook_config.json"
+        "https://raw.githubusercontent.com/NEETSama114/NekoQQ/master/app/src/main/assets/hook_config.json"
 }
 
 /** 一个简单的 hook 点位描述 */
