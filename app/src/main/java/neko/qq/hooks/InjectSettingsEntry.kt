@@ -1,37 +1,30 @@
 package neko.qq.hook
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.Application
-import android.content.ComponentName
-import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
+
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+
+import neko.qq.constants.PrefKeys
+import neko.qq.util.Contexts
 
 object InjectSettingsEntry {
 
     private const val TAG = "NekoQQ-InjectSettingsEntry"
 
-    private const val ENTRY_TEXT = "Neko设置"
     private const val ENTRY_TAG = "neko_qq_settings_entry"
-
-    /*
-     * 不再只依赖“账号与安全”。
-     * 新版 QQ 的设置页面可能调整顺序或布局，
-     * 任意找到一个设置页面的特征文本即可作为锚点。
-     */
-    private val TARGET_TEXTS = listOf(
-        "账号与安全",
-        "消息通知",
-        "模式选择",
-        "个性装扮与特权外显",
-        "通用",
-        "隐私设置"
-    )
 
     fun hook(
         application: Application,
@@ -41,11 +34,7 @@ object InjectSettingsEntry {
             return
         }
 
-        // 设置 UI 只需要在 QQ 主进程运行
         if (lpparam.processName != "com.tencent.mobileqq") {
-            XposedBridge.log(
-                "$TAG: 跳过非主进程: ${lpparam.processName}"
-            )
             return
         }
 
@@ -57,201 +46,450 @@ object InjectSettingsEntry {
                 override fun onActivityCreated(
                     activity: Activity,
                     savedInstanceState: Bundle?
-                ) {
-                }
+                ) = Unit
 
-                override fun onActivityStarted(activity: Activity) {
-                }
+                override fun onActivityStarted(activity: Activity) = Unit
 
                 override fun onActivityResumed(activity: Activity) {
-                    val decorView = activity.window?.decorView ?: return
+                    val root = activity.window?.decorView ?: return
 
-                    /*
-                     * QQ 设置页面可能异步加载。
-                     * 第一次尝试后再进行一次延迟尝试。
-                     */
-                    decorView.postDelayed({
-                        safeInject(activity)
+                    root.postDelayed({
+                        inject(activity)
                     }, 500)
 
-                    decorView.postDelayed({
-                        safeInject(activity)
+                    root.postDelayed({
+                        inject(activity)
                     }, 1500)
                 }
 
-                override fun onActivityPaused(activity: Activity) {
-                }
+                override fun onActivityPaused(activity: Activity) = Unit
 
-                override fun onActivityStopped(activity: Activity) {
-                }
+                override fun onActivityStopped(activity: Activity) = Unit
 
                 override fun onActivitySaveInstanceState(
                     activity: Activity,
                     outState: Bundle
-                ) {
-                }
+                ) = Unit
 
-                override fun onActivityDestroyed(activity: Activity) {
-                }
+                override fun onActivityDestroyed(activity: Activity) = Unit
             }
         )
     }
 
-    private fun safeInject(activity: Activity) {
-        try {
-            injectRow(activity)
-        } catch (t: Throwable) {
-            XposedBridge.log(
-                "$TAG: injectRow异常: ${t.stackTraceToString()}"
-            )
-        }
-    }
-
-    /**
-     * 在 QQ 设置页面插入 Neko设置。
-     *
-     * 新实现不再要求父级必须是 LinearLayout。
-     */
-    private fun injectRow(activity: Activity) {
+    private fun inject(activity: Activity) {
         if (activity.isFinishing || activity.isDestroyed) {
             return
         }
 
-        val decorView = activity.window?.decorView ?: return
+        val root = activity.window?.decorView ?: return
 
-        // 防止重复插入
-        if (findViewByTag(decorView, ENTRY_TAG) != null) {
+        if (findViewByTag(root, ENTRY_TAG) != null) {
             return
         }
 
-        // 找到任意一个设置页特征文字
-        var targetTextView: TextView? = null
+        val anchor = findTextView(root, "账号与安全")
 
-        for (targetText in TARGET_TEXTS) {
-            targetTextView = findTextView(
-                decorView,
-                targetText
-            )
-
-            if (targetTextView != null) {
-                XposedBridge.log(
-                    "$TAG: 找到设置页锚点: $targetText"
-                )
-                break
-            }
-        }
-
-        if (targetTextView == null) {
+        if (anchor == null) {
             return
         }
 
-        /*
-         * 向上寻找真正的“列表项”，然后找到可插入的父容器。
-         *
-         * 这里不再检查 LinearLayout，因此可以兼容
-         * FrameLayout、RecyclerView 等新版 QQ 的布局结构。
-         */
-        val result = findInsertPosition(targetTextView)
+        val row = findSettingsRow(anchor)
 
-        if (result == null) {
+        if (row == null) {
             XposedBridge.log(
-                "$TAG: 找到设置页文字，但无法确定插入位置，Activity=${activity.javaClass.name}"
+                "$TAG: 找到账号与安全，但无法找到完整设置行"
             )
             return
         }
 
-        val parent = result.parent
-        val targetRow = result.row
+        val parent = row.parent as? ViewGroup
 
-        val index = parent.indexOfChild(targetRow)
+        if (parent == null) {
+            XposedBridge.log(
+                "$TAG: 设置行没有可用父容器"
+            )
+            return
+        }
+
+        val index = parent.indexOfChild(row)
 
         if (index < 0) {
-            XposedBridge.log(
-                "$TAG: 无法获取目标行索引"
-            )
             return
         }
 
-        val entryView = createEntryView(
+        val entry = createEntry(
             activity,
-            targetTextView
+            row
         )
 
         try {
             /*
-             * 插入到锚点所在项目的前面。
-             * 如果找到的是“账号与安全”，效果就是原项目设计的位置。
+             * 插入到“账号与安全”前面。
              */
-            parent.addView(entryView, index)
+            parent.addView(entry, index)
 
             XposedBridge.log(
-                "$TAG: 成功插入 Neko设置，Activity=${activity.javaClass.name}"
+                "$TAG: 成功插入完整 Neko设置行，Activity=${activity.javaClass.name}"
             )
 
         } catch (t: Throwable) {
             XposedBridge.log(
-                "$TAG: 插入入口失败: ${t.stackTraceToString()}"
+                "$TAG: 插入失败: ${t.stackTraceToString()}"
             )
         }
     }
 
-    private data class InsertPosition(
-        val parent: ViewGroup,
-        val row: View
-    )
-
     /**
-     * 从 TextView 向上寻找一个可以作为列表项插入的层级。
-     *
-     * 找到第一个父容器中“当前 View 是直接子元素”的位置，
-     * 然后继续向上寻找具有多个子项的容器。
+     * 从“账号与安全”的文字向上寻找真正的一整行设置项。
      */
-    private fun findInsertPosition(
-        target: View
-    ): InsertPosition? {
+    private fun findSettingsRow(
+        textView: TextView
+    ): View? {
 
-        var current: View = target
+        var current: View = textView
 
-        repeat(10) {
+        repeat(8) {
             val parent = current.parent as? ViewGroup
-                ?: return null
+                ?: return current
 
             /*
-             * 有多个直接子 View 的父容器通常是设置列表。
+             * 如果当前 View 是父容器的直接子项，
+             * 并且父容器还有多个类似项目，
+             * 继续向上寻找。
              */
-            if (parent.childCount >= 2) {
-                return InsertPosition(
-                    parent = parent,
-                    row = current
-                )
+            val grandParent = parent.parent as? ViewGroup
+
+            if (grandParent != null) {
+                val siblings = grandParent.childCount
+
+                /*
+                 * QQ 设置列表通常包含多个条目。
+                 * current 的父布局作为“整行”更合理。
+                 */
+                if (siblings >= 2 && siblings <= 30) {
+                    return parent
+                }
             }
 
             current = parent
         }
 
-        return null
+        return current
+    }
+
+    private fun createEntry(
+        activity: Activity,
+        referenceRow: View
+    ): View {
+
+        val density =
+            activity.resources.displayMetrics.density
+
+        fun dp(value: Int): Int =
+            (value * density + 0.5f).toInt()
+
+        /*
+         * 创建完整的一行，而不是只创建 TextView。
+         */
+        val container = LinearLayout(activity)
+
+        container.tag = ENTRY_TAG
+        container.orientation = LinearLayout.HORIZONTAL
+        container.gravity = Gravity.CENTER_VERTICAL
+
+        container.minimumHeight =
+            if (referenceRow.height > 0) {
+                referenceRow.height
+            } else {
+                dp(56)
+            }
+
+        container.setPadding(
+            dp(20),
+            dp(12),
+            dp(16),
+            dp(12)
+        )
+
+        val title = TextView(activity)
+
+        title.text = "Neko设置"
+        title.textSize = 16f
+        title.setTextColor(Color.WHITE)
+
+        title.layoutParams =
+            LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+
+        val arrow = TextView(activity)
+
+        arrow.text = "›"
+        arrow.textSize = 28f
+        arrow.gravity = Gravity.CENTER
+        arrow.setTextColor(
+            Color.rgb(160, 160, 160)
+        )
+
+        container.addView(title)
+        container.addView(arrow)
+
+        /*
+         * 尽量继承 QQ 原设置行的背景。
+         */
+        container.background =
+            referenceRow.background
+                ?.constantState
+                ?.newDrawable()
+                ?.mutate()
+
+        if (container.background == null) {
+            val bg = GradientDrawable()
+
+            bg.setColor(
+                Color.rgb(40, 40, 40)
+            )
+
+            bg.cornerRadius =
+                dp(12).toFloat()
+
+            container.background = bg
+        }
+
+        container.setOnClickListener {
+            showNekoSettings(activity)
+        }
+
+        return container
     }
 
     /**
-     * 递归查找指定文字。
+     * 在 QQ 当前窗口内显示 NekoQQ 设置。
+     *
+     * 不启动 NekoSettingsActivity，
+     * 因此不会触发“即将离开QQ”的提示。
      */
+    private fun showNekoSettings(
+        activity: Activity
+    ) {
+        try {
+            val moduleContext =
+                Contexts.moduleContext()
+
+            val prefs =
+                moduleContext.getSharedPreferences(
+                    PrefKeys.PREFS_NAME,
+                    android.content.Context.MODE_PRIVATE
+                )
+
+            val density =
+                activity.resources.displayMetrics.density
+
+            fun dp(value: Int): Int =
+                (value * density + 0.5f).toInt()
+
+            val scrollView =
+                ScrollView(activity)
+
+            val content =
+                LinearLayout(activity)
+
+            content.orientation =
+                LinearLayout.VERTICAL
+
+            content.setPadding(
+                dp(20),
+                dp(8),
+                dp(20),
+                dp(8)
+            )
+
+            scrollView.addView(content)
+
+            /*
+             * 防撤回
+             */
+            val antiRecall =
+                Switch(activity)
+
+            antiRecall.text = "防撤回"
+
+            antiRecall.isChecked =
+                prefs.getBoolean(
+                    PrefKeys.ANTI_RECALL,
+                    true
+                )
+
+            antiRecall.setOnCheckedChangeListener {
+                    _,
+                    checked ->
+
+                prefs.edit()
+                    .putBoolean(
+                        PrefKeys.ANTI_RECALL,
+                        checked
+                    )
+                    .apply()
+            }
+
+            content.addView(antiRecall)
+
+            /*
+             * 撤回提示
+             */
+            val recallBanner =
+                Switch(activity)
+
+            recallBanner.text =
+                "显示撤回提示"
+
+            recallBanner.isChecked =
+                prefs.getBoolean(
+                    PrefKeys.RECALL_BANNER,
+                    true
+                )
+
+            recallBanner.setOnCheckedChangeListener {
+                    _,
+                    checked ->
+
+                prefs.edit()
+                    .putBoolean(
+                        PrefKeys.RECALL_BANNER,
+                        checked
+                    )
+                    .apply()
+            }
+
+            content.addView(recallBanner)
+
+            /*
+             * 群管理
+             */
+            val groupManager =
+                Switch(activity)
+
+            groupManager.text =
+                "高级群管理"
+
+            groupManager.isChecked =
+                prefs.getBoolean(
+                    PrefKeys.GROUP_MGR,
+                    true
+                )
+
+            groupManager.setOnCheckedChangeListener {
+                    _,
+                    checked ->
+
+                prefs.edit()
+                    .putBoolean(
+                        PrefKeys.GROUP_MGR,
+                        checked
+                    )
+                    .apply()
+            }
+
+            content.addView(groupManager)
+
+            /*
+             * 表情面板
+             */
+            val emojiPanel =
+                Switch(activity)
+
+            emojiPanel.text =
+                "自定义表情面板"
+
+            emojiPanel.isChecked =
+                prefs.getBoolean(
+                    PrefKeys.EMOJI_PANEL,
+                    true
+                )
+
+            emojiPanel.setOnCheckedChangeListener {
+                    _,
+                    checked ->
+
+                prefs.edit()
+                    .putBoolean(
+                        PrefKeys.EMOJI_PANEL,
+                        checked
+                    )
+                    .apply()
+            }
+
+            content.addView(emojiPanel)
+
+            /*
+             * 自动拉取
+             */
+            val autoPull =
+                Switch(activity)
+
+            autoPull.text =
+                "自动更新 Hook 配置"
+
+            autoPull.isChecked =
+                prefs.getBoolean(
+                    PrefKeys.AUTO_PULL,
+                    true
+                )
+
+            autoPull.setOnCheckedChangeListener {
+                    _,
+                    checked ->
+
+                prefs.edit()
+                    .putBoolean(
+                        PrefKeys.AUTO_PULL,
+                        checked
+                    )
+                    .apply()
+            }
+
+            content.addView(autoPull)
+
+            AlertDialog.Builder(activity)
+                .setTitle("NekoQQ 设置")
+                .setView(scrollView)
+                .setPositiveButton(
+                    "完成",
+                    null
+                )
+                .show()
+
+            XposedBridge.log(
+                "$TAG: 已在 QQ 内显示 NekoQQ 设置"
+            )
+
+        } catch (t: Throwable) {
+            XposedBridge.log(
+                "$TAG: 打开内嵌设置失败: ${t.stackTraceToString()}"
+            )
+        }
+    }
+
     private fun findTextView(
         root: View,
-        targetText: String
+        target: String
     ): TextView? {
 
-        if (root is TextView) {
-            if (root.text?.toString()?.trim() == targetText) {
-                return root
-            }
+        if (root is TextView &&
+            root.text?.toString()?.trim() == target
+        ) {
+            return root
         }
 
         if (root is ViewGroup) {
             for (i in 0 until root.childCount) {
-                val result = findTextView(
-                    root.getChildAt(i),
-                    targetText
-                )
+                val result =
+                    findTextView(
+                        root.getChildAt(i),
+                        target
+                    )
 
                 if (result != null) {
                     return result
@@ -262,9 +500,6 @@ object InjectSettingsEntry {
         return null
     }
 
-    /**
-     * 递归根据 Tag 查找 View。
-     */
     private fun findViewByTag(
         root: View,
         tag: String
@@ -276,10 +511,11 @@ object InjectSettingsEntry {
 
         if (root is ViewGroup) {
             for (i in 0 until root.childCount) {
-                val result = findViewByTag(
-                    root.getChildAt(i),
-                    tag
-                )
+                val result =
+                    findViewByTag(
+                        root.getChildAt(i),
+                        tag
+                    )
 
                 if (result != null) {
                     return result
@@ -288,99 +524,5 @@ object InjectSettingsEntry {
         }
 
         return null
-    }
-
-    /**
-     * 创建 Neko设置入口。
-     */
-    private fun createEntryView(
-        activity: Activity,
-        referenceTextView: TextView
-    ): TextView {
-
-        val entry = TextView(activity)
-
-        entry.text = ENTRY_TEXT
-        entry.tag = ENTRY_TAG
-
-        entry.gravity = Gravity.CENTER_VERTICAL
-
-        entry.textSize =
-            referenceTextView.textSize /
-                activity.resources.displayMetrics.scaledDensity
-
-        entry.setTextColor(
-            referenceTextView.currentTextColor
-        )
-
-        entry.typeface = referenceTextView.typeface
-
-        entry.setPadding(
-            referenceTextView.paddingLeft,
-            referenceTextView.paddingTop,
-            referenceTextView.paddingRight,
-            referenceTextView.paddingBottom
-        )
-
-        entry.isClickable = true
-        entry.isFocusable = true
-
-        entry.background =
-            referenceTextView.background
-                ?.constantState
-                ?.newDrawable()
-                ?.mutate()
-
-        val height = if (referenceTextView.height > 0) {
-            referenceTextView.height
-        } else {
-            dp(activity, 56)
-        }
-
-        entry.layoutParams = ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            height
-        )
-
-        entry.setOnClickListener {
-            openSettings(activity)
-        }
-
-        return entry
-    }
-
-    private fun openSettings(
-        activity: Activity
-    ) {
-        try {
-            val intent = Intent().apply {
-                component = ComponentName(
-                    "neko.qq",
-                    "neko.qq.ui.NekoSettingsActivity"
-                )
-            }
-
-            activity.startActivity(intent)
-
-            XposedBridge.log(
-                "$TAG: 已启动 NekoSettingsActivity"
-            )
-
-        } catch (t: Throwable) {
-            XposedBridge.log(
-                "$TAG: 启动 NekoSettingsActivity 失败: ${t.stackTraceToString()}"
-            )
-        }
-    }
-
-    private fun dp(
-        activity: Activity,
-        value: Int
-    ): Int {
-        return (
-            value *
-                activity.resources.displayMetrics.density +
-                0.5f
-            ).toInt()
     }
 }
