@@ -72,6 +72,6 @@ object Prefs {
     val autoPull: Boolean get() = bool(PrefKeys.AUTO_PULL, true)
     val autoPullUrl: String get() = str(
         PrefKeys.AUTO_PULL_URL,
-        "https://raw.githubusercontent.com/NekoAiDev/NekoQQ/main/app/src/main/assets/hook_config.json"
+        "https://raw.githubusercontent.com/NEETSama114/NekoQQ/main/app/src/main/assets/hook_config.json"
     )
 }
